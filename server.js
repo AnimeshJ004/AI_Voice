@@ -29,7 +29,7 @@ app.get('/health', (req, res) => {
 // ─── MongoDB Connection ───────────────────────────────────────────────────────
 async function connectDB() {
   if (!process.env.MONGODB_URI) {
-    console.log('⚠️  No MONGODB_URI found. Running without database — call logs will not persist.');
+    console.log('ℹ️  Running without database (no MONGODB_URI set). This is fine — calls will still work.');
     return;
   }
   try {
