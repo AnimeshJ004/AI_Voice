@@ -12,10 +12,14 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 const callSessions = new Map();
 
 // Helper — DB operations are optional; never crash if MongoDB is down
+const mongoose = require('mongoose');
+
 async function dbUpdate(query, update, opts = {}) {
+  if (mongoose.connection.readyState !== 1) return; // Skip if DB not connected
   try { await Call.findOneAndUpdate(query, update, opts); } catch (_) {}
 }
 async function dbPush(callSid, entry) {
+  if (mongoose.connection.readyState !== 1) return; // Skip if DB not connected
   try { await Call.findOneAndUpdate({ callSid }, { $push: { transcript: entry } }); } catch (_) {}
 }
 
