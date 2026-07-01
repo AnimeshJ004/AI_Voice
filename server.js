@@ -69,4 +69,12 @@ async function start() {
   });
 }
 
-start();
+// Vercel serverless functions require the app to be exported.
+// They don't use app.listen().
+if (process.env.VERCEL) {
+  connectDB();
+  module.exports = app;
+} else {
+  start();
+  module.exports = app;
+}
