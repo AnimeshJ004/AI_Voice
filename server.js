@@ -28,13 +28,16 @@ app.get('/health', (req, res) => {
 
 // ─── MongoDB Connection ───────────────────────────────────────────────────────
 async function connectDB() {
+  if (!process.env.MONGODB_URI) {
+    console.log('⚠️  No MONGODB_URI found. Running without database — call logs will not persist.');
+    return;
+  }
   try {
     mongoose.set('bufferCommands', false);
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-voice-agent');
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ MongoDB connected');
   } catch (err) {
     console.error('❌ MongoDB connection failed:', err.message);
-    console.log('⚠️  Running without database — call logs will not persist.');
   }
 }
 
