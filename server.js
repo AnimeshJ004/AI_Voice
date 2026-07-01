@@ -15,6 +15,13 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Required for Twilio webhooks
+
+// ─── Request Logger — so we can see Twilio POSTs in Vercel logs ──────────────
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public'))); // Dashboard + audio files
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -24,6 +31,45 @@ app.use('/api', apiRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Debug endpoint — lets you verify everything works from a browser
+app.get('/debug', (req, res) => {
+  res.json({
+    status: 'ok',
+    env: {
+      TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID ? '✅ Set' : '❌ Missing',
+      TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ? '✅ Set' : '❌ Missing',
+      TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ? '✅ Set' : '❌ Missing',
+      GROQ_API_KEY: process.env.GROQ_API_KEY ? '✅ Set' : '❌ Missing',
+      GROQ_MODEL: process.env.GROQ_MODEL || '(not set, will use default)',
+      BASE_URL: process.env.BASE_URL || '❌ Missing',
+      MONGODB_URI: process.env.MONGODB_URI ? '✅ Set' : '⏭️ Skipped (optional)',
+      VERCEL: process.env.VERCEL ? 'true' : 'false',
+    },
+    routes: [
+      'POST /call/voice - Twilio incoming call webhook',
+      'POST /call/language - Language selection',
+      'POST /call/listen - Gather speech',
+      'POST /call/respond - AI response',
+      'POST /call/status - Call status webhook',
+    ],
+  });
+});
+
+// ─── Global Error Handler — catch any unhandled errors ───────────────────────
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled error:', err.message, err.stack);
+  // Always return valid TwiML on error so Twilio doesn't say "Application Error"
+  if (req.url.startsWith('/call')) {
+    const twilio = require('twilio');
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say('Sorry, something went wrong. Please try again later.');
+    twiml.hangup();
+    res.type('text/xml');
+    return res.status(200).send(twiml.toString());
+  }
+  res.status(500).json({ error: err.message });
 });
 
 // ─── MongoDB Connection ───────────────────────────────────────────────────────
@@ -43,7 +89,7 @@ async function connectDB() {
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 async function start() {
-  connectDB(); // Run in background, do not block server startup
+  connectDB();
 
   app.listen(PORT, () => {
     console.log('');
@@ -73,7 +119,6 @@ async function start() {
 }
 
 // Vercel serverless functions require the app to be exported.
-// They don't use app.listen().
 if (process.env.VERCEL) {
   connectDB();
   module.exports = app;
